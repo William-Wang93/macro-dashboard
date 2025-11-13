@@ -298,7 +298,13 @@ if module == "Overview":
     else:
         mask = (df.index >= pd.to_datetime(start)) & (df.index <= pd.to_datetime(end))
         fig = line_chart(df.loc[mask], title="Headline view")
-        fig = add_recession_shades(fig, rec)
+        if not rec.empty:
+                rec_window = rec.loc[
+                (rec.index >= pd.to_datetime(start)) & (rec.index <= pd.to_datetime(end))]
+            fig = add_recession_shades(fig, rec_window)
+        st.plotly_chart(fig, use_container_width=True)
+
+
         st.plotly_chart(fig, use_container_width=True)
 
     # Yield curve spread
