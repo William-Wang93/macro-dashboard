@@ -177,6 +177,8 @@ def line_chart(df: pd.DataFrame, title: str, yaxis_title: Optional[str] = None) 
     fig.update_layout(margin=dict(l=10, r=10, t=50, b=10), legend=dict(orientation="h"))
     if yaxis_title:
         fig.update_yaxes(title=yaxis_title)
+      # Force x-axis to start around 1960
+    fig.update_xaxes(range=["1960-01-01", None])
     return fig
 
 # ------------------------
