@@ -305,7 +305,7 @@ if module == "Overview":
         st.plotly_chart(fig, use_container_width=True)
 
 
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, use_container_width=True, key="overview_headline")
 
     # Yield curve spread
     st.markdown("**Yield Curve (10Y − 2Y)**")
