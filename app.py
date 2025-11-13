@@ -301,7 +301,7 @@ if module == "Overview":
         if not rec.empty:
                 rec_window = rec.loc[
                 (rec.index >= pd.to_datetime(start)) & (rec.index <= pd.to_datetime(end))]
-            fig = add_recession_shades(fig, rec_window)
+        fig = add_recession_shades(fig, rec_window)
         st.plotly_chart(fig, use_container_width=True)
 
 
