@@ -24,16 +24,26 @@ if not FRED_API_KEY:
 
 fred = Fred(api_key=FRED_API_KEY)
 
+# -----------------------------
+# FRED series list
+# -----------------------------
 SERIES = {
+    # Core macro
     "CPIAUCSL": "CPI (Urban Consumers, SA)",
     "UNRATE": "Unemployment Rate",
     "PAYEMS": "Nonfarm Payrolls",
     "DGS10": "10Y Treasury Yield",
     "DGS2": "2Y Treasury Yield",
     "T10YIE": "10Y Inflation Expectations",
+
+    # Housing defaults
+    "CSUSHPINSA": "Case-Shiller Home Price Index (SA)",
+    "HOUST": "Housing Starts",
+    "PERMIT": "Building Permits",
+    "MORTGAGE30US": "30Y Mortgage Rate",
 }
 
-GLOBAL_START = date(1960, 1, 1)  # 👈 hard min for all charts
+GLOBAL_START = date(1960, 1, 1)  # hard min for all charts
 
 
 # -----------------------------
@@ -64,7 +74,7 @@ def load_fred_data(start: date, end: date) -> pd.DataFrame:
     combined_df = pd.concat(frames, ignore_index=True)
     combined_df = combined_df.sort_values("date")
 
-    # 👇 Year-over-year % change (12 months)
+    # Year-over-year % change (12 months)
     combined_df["yoy"] = (
         combined_df.groupby("variable")["value"].pct_change(12) * 100
     )
@@ -82,7 +92,7 @@ def main():
     today = date.today()
     combined_df = load_fred_data(GLOBAL_START, today)
 
-    # Diagnostics (you can comment this out later)
+    # Diagnostics (optional)
     st.write(
         "Full data date range:",
         combined_df["date"].min(),
@@ -96,7 +106,6 @@ def main():
     min_date = combined_df["date"].min().date()
     max_date = combined_df["date"].max().date()
 
-    # Default start = 1960-01-01 (or earliest available)
     start_date = st.sidebar.date_input(
         "Start date",
         value=min_date,
@@ -115,12 +124,21 @@ def main():
         st.sidebar.error("Start date must be before end date.")
         st.stop()
 
-    # Placeholder for future module logic if you want
-    module = st.sidebar.selectbox(
+    _module = st.sidebar.selectbox(
         "Module",
         options=["Overview"],
         index=0,
     )
+
+    # Helper: consistent axes for every chart
+    def format_fig(fig):
+        # X: always 1960 -> selected end date
+        fig.update_xaxes(
+            range=[pd.Timestamp(GLOBAL_START), pd.to_datetime(end_date)]
+        )
+        # Y: focus around normal macro moves
+        fig.update_yaxes(range=[-50, 100], title="YoY % Change")
+        return fig
 
     # 3️⃣ Filter data by selected date range
     mask = (
@@ -133,7 +151,7 @@ def main():
         st.warning("No data in this date range.")
         st.stop()
 
-    # 4️⃣ Headline numbers (still using levels for now)
+    # 4️⃣ Headline numbers (using levels)
     latest = (
         df_filtered.sort_values("date").groupby("variable").tail(1).set_index("variable")
     )
@@ -193,7 +211,7 @@ def main():
         ["Overview", "Inflation", "Labor", "Rates & Curve", "Housing", "Markets"]
     )
 
-    # ---- Helper: drop NaNs in yoy before plotting ----
+    # Helper: drop NaNs in yoy before plotting
     def clean_yoy(df: pd.DataFrame) -> pd.DataFrame:
         return df.dropna(subset=["yoy"])
 
@@ -210,9 +228,7 @@ def main():
             labels={"date": "Date", "yoy": "YoY % Change", "label": "Series"},
             template="plotly_white",
         )
-        fig_all.update_xaxes(
-            range=[pd.Timestamp(GLOBAL_START), pd.to_datetime(end_date)]
-        )
+        fig_all = format_fig(fig_all)
         st.plotly_chart(fig_all, use_container_width=True)
 
     # ---- Inflation tab ----
@@ -234,9 +250,7 @@ def main():
                 labels={"date": "Date", "yoy": "YoY % Change", "label": "Series"},
                 template="plotly_white",
             )
-            fig_infl.update_xaxes(
-                range=[pd.Timestamp(GLOBAL_START), pd.to_datetime(end_date)]
-            )
+            fig_infl = format_fig(fig_infl)
             st.plotly_chart(fig_infl, use_container_width=True)
 
     # ---- Labor tab ----
@@ -258,9 +272,7 @@ def main():
                 labels={"date": "Date", "yoy": "YoY % Change", "label": "Series"},
                 template="plotly_white",
             )
-            fig_labor.update_xaxes(
-                range=[pd.Timestamp(GLOBAL_START), pd.to_datetime(end_date)]
-            )
+            fig_labor = format_fig(fig_labor)
             st.plotly_chart(fig_labor, use_container_width=True)
 
     # ---- Rates & Curve tab ----
@@ -282,18 +294,35 @@ def main():
                 labels={"date": "Date", "yoy": "YoY % Change", "label": "Series"},
                 template="plotly_white",
             )
-            fig_rates.update_xaxes(
-                range=[pd.Timestamp(GLOBAL_START), pd.to_datetime(end_date)]
-            )
+            fig_rates = format_fig(fig_rates)
             st.plotly_chart(fig_rates, use_container_width=True)
 
-    # ---- Housing tab (placeholder for now) ----
+    # ---- Housing tab ----
     with tab_housing:
-        st.subheader("Housing")
-        st.info(
-            "Hook your housing series (Case-Shiller, housing starts, mortgage rates, etc.) "
-            "into this tab by adding FRED series IDs to the `SERIES` dict and filtering here."
-        )
+        st.subheader("Housing (YoY %)")
+
+        
+        housing_vars = ["CSUSHPINSA", "HOUST", "PERMIT", "MORTGAGE30US"]
+        df_housing = df_filtered[df_filtered["variable"].isin(housing_vars)]
+        df_housing = clean_yoy(df_housing)
+
+        if df_housing.empty:
+            st.info("No housing data in this date range.")
+        else:
+            fig_housing = px.line(
+                df_housing,
+                x="date",
+                y="yoy",
+                color="label",
+                labels={
+                    "date": "Date",
+                    "yoy": "YoY % Change",
+                    "label": "Series",
+                },
+                template="plotly_white",
+            )
+            fig_housing = format_fig(fig_housing)
+            st.plotly_chart(fig_housing, use_container_width=True)
 
     # ---- Markets tab (placeholder for now) ----
     with tab_markets:
@@ -306,4 +335,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
